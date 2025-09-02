@@ -1,0 +1,113 @@
+Lab USB Toolkit – Offline Hive Copy & Processing
+================================================
+
+Scope
+-----
+• For lab use only, on systems you are authorized to examine.
+• No live-OS credential grabbing. Hives are copied only in Recovery Mode or via reg save (Admin CMD).
+• Use consistent Labels for each target (e.g., WIN10LAB, SERVER2019).
+
+Folder layout
+-------------
+\scripts\   -> helpers for hive dumping and decoding
+\hives\     -> per-label hive copies (SAM, SYSTEM, SECURITY)
+\results\   -> decoded NTLM hashes and cracked results
+\guides\    -> this instruction file
+
+------------------------------------------------
+Step 1: Prepare the USB
+------------------------------------------------
+1. Ensure this USB has the following folders:
+   • \scripts\
+   • \hives\
+   • \results\
+   • \guides\
+
+2. Confirm scripts are present:
+   • dump_hives.cmd (Windows)
+   • kali_dump_latest.sh (Kali)
+
+3. Optionally include Impacket + Portable Python if you want Windows-side processing.
+
+------------------------------------------------
+Step 2: Collect Hives (Offline Preferred)
+------------------------------------------------
+Option A – Windows Recovery Environment (WinRE):
+1. Boot the target into Recovery CMD.
+2. Insert the USB.
+3. Identify the USB drive letter (may be D:, E:, F:, or G:).
+4. Run:
+   G:\scripts\dump_hives.cmd
+
+→ Hives will be saved under:
+   \hives\<Label>\ (SAM.save, SYSTEM.save, SECURITY.save)
+
+Option B – Windows Live (Admin CMD):
+1. Log in with Administrator rights.
+2. Insert the USB.
+3. Open CMD as Administrator.
+4. Run:
+   G:\scripts\dump_hives.cmd
+
+→ Same output under:
+   \hives\<Label>\
+
+------------------------------------------------
+Step 3: Decode with Impacket
+------------------------------------------------
+Option A – Kali Linux (preferred):
+1. Mount the USB (e.g., /media/<user>/USB20FD).
+2. Install Impacket if not already present:
+   sudo apt update && sudo apt install -y python3-impacket
+3. Run:
+   ./scripts/kali_dump_latest.sh
+
+→ Output log created in:
+   \results\<Label>\secretsdump_YYYY-MM-DD_HH-MM-SS.log
+
+Option B – Windows Portable:
+1. Extract Portable Python to \Python\
+2. Install Impacket dependencies:
+   G:\Python\python.exe -m pip install -r G:\impacket\requirements.txt -t G:\impacket
+3. Run:
+   G:\scripts\process_hives_windows.bat <Label>
+
+→ Output in:
+   \results\<Label>\*_offline.txt
+
+------------------------------------------------
+Step 4: Crack NTLM Hashes with Hashcat
+------------------------------------------------
+1. Copy or mount the USB in Kali or another cracking machine.
+2. Extract NTLM hashes from secretsdump log:
+   grep -E "^[^:]+:[^:]+:[0-9a-f]{32}" results/<Label>/secretsdump_*.log > results/<Label>/hashes.txt
+
+3. Run brute-force attacks:
+
+   • 8 lowercase:
+     hashcat -m 1000 -a 3 results/<Label>/hashes.txt ?l?l?l?l?l?l?l?l
+
+   • 8 mixed upper/lower/digits:
+     hashcat -m 1000 -a 3 results/<Label>/hashes.txt ?u?l?l?l?l?d?d?d
+
+   • Incremental up to 6 characters:
+     hashcat -m 1000 -a 3 results/<Label>/hashes.txt ?a?a?a?a?a?a --increment
+
+   • Resume a run:
+     hashcat -m 1000 -a 3 results/<Label>/hashes.txt ?a?a?a?a?a?a --increment --restore
+
+4. Cracked passwords will be displayed in Hashcat’s output or stored in potfiles.
+
+------------------------------------------------
+Verification
+------------------------------------------------
+Windows: run \scripts\verify_setup.bat
+Kali:    run \scripts\verify_setup.sh
+
+------------------------------------------------
+Notes
+------------------------------------------------
+• Change drive letter if USB mounts differently.
+• Use consistent Labels across dump, decode, and crack steps.
+• All data stays on the USB; no host installation required.
+• For lab/offline testing only.
